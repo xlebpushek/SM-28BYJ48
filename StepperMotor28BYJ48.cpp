@@ -1,88 +1,61 @@
 #include "StepperMotor28BYJ48.h"
 
-StepperMotor28BYJ48::StepperMotor28BYJ48(const unsigned int kPin1, const unsigned int kPin2, const unsigned int kPin3, const unsigned int kPin4)
-    : _kPin1(kPin1), _kPin2(kPin2), _kPin3(kPin3), _kPin4(kPin4), _step_mode(StepModeType::fullStep), _rotation_direction(RotationDirectionType::clockwise), _time_between_steps(0)
+StepperMotor28BYJ48::StepperMotor28BYJ48(const unsigned int kPin1, const unsigned int kPin2, const unsigned int kPin3, const unsigned int kPin4) : _kPin1(kPin1), _kPin2(kPin2), _kPin3(kPin3), _kPin4(kPin4)
 {
   pinMode(kPin1, OUTPUT);
   pinMode(kPin2, OUTPUT);
   pinMode(kPin3, OUTPUT);
   pinMode(kPin4, OUTPUT);
 
-  StepperMotor28BYJ48::setSpeed(100);
+  setSpeed(100);
 }
 
 void StepperMotor28BYJ48::setSpeed(const unsigned int kSpeed)
 {
-  _time_between_steps = 6e+7 / (((15 * (_step_mode == StepModeType::halfStep ? 4075 : 2037)) / 100) * (kSpeed > 100 ? 100 : kSpeed));
+  time_between_steps_ = 6e+7 / (((15 * (step_mode_ == StepModeEnum::HALF_STEP ? 4075 : 2037)) / 100) * (kSpeed > 100 ? 100 : kSpeed));
 }
 
-void StepperMotor28BYJ48::setRotationDirection(const RotationDirectionType kRotationDirection)
+void StepperMotor28BYJ48::setRotationDirection(const RotationDirectionEnum kRotationDirection)
 {
-  _rotation_direction = kRotationDirection;
+  rotation_direction_ = kRotationDirection;
 }
 
-void StepperMotor28BYJ48::setStepMode(const StepModeType kStepMode)
+void StepperMotor28BYJ48::setStepMode(const StepModeEnum kStepMode)
 {
-  _step_mode = kStepMode;
+  step_mode_ = kStepMode;
 }
 
-void StepperMotor28BYJ48::step(const unsigned int kSteps)
+void StepperMotor28BYJ48::step(const unsigned int kTotalSteps)
 {
-  unsigned int steps = kSteps;
-  unsigned int current_step;
+  unsigned int remaining_steps = kTotalSteps;
   unsigned long time_since_last_step;
 
-  while (steps > 0)
+  while (remaining_steps > 0)
   {
-    if (micros() - time_since_last_step >= _time_between_steps)
+    if (micros() - time_since_last_step >= time_between_steps_)
     {
       time_since_last_step = micros();
 
-      if (_rotation_direction == RotationDirectionType::clockwise)
+      if (rotation_direction_ == RotationDirectionEnum::CLOCKWISE)
       {
-        current_step++;
-        if (current_step == kSteps)
-          current_step = 0;
+        current_step_++;
+
+        if (current_step_ == kTotalSteps)
+          current_step_ = 0;
       }
-      else
+      else if (rotation_direction_ == RotationDirectionEnum::COUNTER_CLOCKWISE)
       {
-        if (current_step == 0)
-          current_step = kSteps;
-        current_step--;
+        if (current_step_ == 0)
+          current_step_ = kTotalSteps;
+
+        current_step_--;
       }
 
-      steps--;
+      remaining_steps--;
 
-      if (_step_mode == StepModeType::halfStep)
+      if (step_mode_ == StepModeEnum::HALF_STEP)
       {
-        /*
-          O - Orange pin.
-          Y - Yellow pin.
-          P - Pink pin.
-          B - Blue pin.
-
-          ┏━━━━━━┳━━━━━┳━━━━━┳━━━━━┳━━━━━┓
-          ┃ step ┃  O  ┃  Y  ┃  P  ┃  B  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  8	 ┃  1  ┃  0  ┃  0  ┃  1  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  7	 ┃  0  ┃  0  ┃  0  ┃  1  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  6	 ┃  0  ┃  0  ┃  1  ┃  1  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  5	 ┃  0  ┃  0  ┃  1  ┃  0  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  4	 ┃  0  ┃  1  ┃  1  ┃  0  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  3	 ┃  0  ┃  1  ┃  0  ┃  0  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  2   ┃  1  ┃  1  ┃  0  ┃  0  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  1   ┃  1  ┃  0  ┃  0  ┃  0  ┃
-          ┗━━━━━━┻━━━━━┻━━━━━┻━━━━━┻━━━━━┛
-
-        */
-        switch (current_step % 8)
+        switch (current_step_ % 8)
         {
         case 0:
           digitalWrite(_kPin1, HIGH);
@@ -135,28 +108,9 @@ void StepperMotor28BYJ48::step(const unsigned int kSteps)
           break;
         }
       }
-      else
+      else if (step_mode_ == StepModeEnum::FULL_STEP)
       {
-
-        /*
-          O - Orange pin.
-          Y - Yellow pin.
-          P - Pink pin.
-          B - Blue pin.
-
-          ┏━━━━━━┳━━━━━┳━━━━━┳━━━━━┳━━━━━┓
-          ┃ step ┃  O  ┃  Y  ┃  P  ┃  B  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  3   ┃  1  ┃  0  ┃  0  ┃  1  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  2   ┃  0  ┃  0  ┃  1  ┃  1  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  1   ┃  0  ┃  1  ┃  1  ┃  0  ┃
-          ┣━━━━━━╋━━━━━╋━━━━━╋━━━━━╋━━━━━┫
-          ┃  0	 ┃  1  ┃  1  ┃  0  ┃  0  ┃
-          ┗━━━━━━┻━━━━━┻━━━━━┻━━━━━┻━━━━━┛
-        */
-        switch (current_step % 4)
+        switch (current_step_ % 4)
         {
         case 0:
           digitalWrite(_kPin1, HIGH);
@@ -186,4 +140,9 @@ void StepperMotor28BYJ48::step(const unsigned int kSteps)
       }
     }
   }
+}
+
+unsigned int StepperMotor28BYJ48::getCurrentStep()
+{
+  return 0;
 }
